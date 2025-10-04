@@ -83,6 +83,8 @@ h1 {
     margin: 0 auto;
     display: grid;
     gap: 0;
+    grid-template-columns: repeat(9, 30px);
+    grid-template-rows: repeat(9, 30px);
 }
 
 .cell {
@@ -229,8 +231,8 @@ h1 {
     }
     
     .game-board {
-        grid-template-columns: repeat(var(--cols, 9), 25px) !important;
-        grid-template-rows: repeat(var(--rows, 9), 25px) !important;
+        grid-template-columns: repeat(9, 25px) !important;
+        grid-template-rows: repeat(9, 25px) !important;
     }
     
     .cell.flagged::before,
@@ -258,8 +260,8 @@ h1 {
     }
     
     .game-board {
-        grid-template-columns: repeat(var(--cols, 9), 22px) !important;
-        grid-template-rows: repeat(var(--rows, 9), 22px) !important;
+        grid-template-columns: repeat(9, 22px) !important;
+        grid-template-rows: repeat(9, 22px) !important;
     }
     
     .cell.flagged::before,
@@ -297,8 +299,8 @@ h1 {
     }
     
     .game-board {
-        grid-template-columns: repeat(var(--cols, 9), 20px) !important;
-        grid-template-rows: repeat(var(--rows, 9), 20px) !important;
+        grid-template-columns: repeat(9, 20px) !important;
+        grid-template-rows: repeat(9, 20px) !important;
     }
     
     .cell.flagged::before,
