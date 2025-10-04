@@ -1,338 +1,337 @@
-* {
-    box-sizing: border-box;
-}
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Mayın Tarlası Oyunu</title>
+    <link rel="stylesheet" href="mayin-tarlasi.css">
+</head>
+<body>
+    <div class="game-container">
+        <h1>Mayın Tarlası Oyunu</h1>
+        
+        <div class="difficulty-selector">
+            <button class="difficulty-btn active" data-difficulty="easy">Kolay (9x9, 10 mayın)</button>
+            <button class="difficulty-btn" data-difficulty="medium">Orta (16x16, 40 mayın)</button>
+            <button class="difficulty-btn" data-difficulty="hard">Zor (16x30, 99 mayın)</button>
+        </div>
 
-body {
-    font-family: Arial, sans-serif;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    background-color: #f0f0f0;
-    margin: 0;
-    padding: 10px;
-    min-height: 100vh;
-}
+        <div class="game-header">
+            <div class="game-info">
+                <div class="info-item" id="mine-count">Mayın: 10</div>
+                <div class="info-item" id="timer">Süre: 000</div>
+            </div>
+            <button class="restart-btn" onclick="restartGame()">Yeniden Başla</button>
+        </div>
 
-.game-container {
-    background-color: white;
-    padding: 15px;
-    border-radius: 10px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    width: 100%;
-    max-width: 600px;
-}
+        <div class="game-board" id="game-board"></div>
+    </div>
 
-h1 {
-    text-align: center;
-    margin: 0 0 15px 0;
-    font-size: 1.5em;
-    color: #333;
-}
+    <script>
+        class Minesweeper {
+            constructor() {
+                this.difficulties = {
+                    easy: { rows: 9, cols: 9, mines: 10 },
+                    medium: { rows: 16, cols: 16, mines: 40 },
+                    hard: { rows: 16, cols: 30, mines: 99 }
+                };
+                this.currentDifficulty = 'easy';
+                this.board = [];
+                this.gameOver = false;
+                this.gameWon = false;
+                this.firstClick = true;
+                this.timer = 0;
+                this.timerInterval = null;
+                this.flaggedCells = 0;
+                
+                this.init();
+            }
 
-.game-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 15px;
-    padding: 10px;
-    background-color: #e0e0e0;
-    border-radius: 5px;
-    flex-wrap: wrap;
-    gap: 10px;
-}
+            init() {
+                this.setupDifficultyButtons();
+                this.createBoard();
+                this.updateDisplay();
+            }
 
-.game-info {
-    display: flex;
-    gap: 15px;
-    align-items: center;
-    flex-wrap: wrap;
-}
+            setupDifficultyButtons() {
+                const buttons = document.querySelectorAll('.difficulty-btn');
+                buttons.forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        buttons.forEach(b => b.classList.remove('active'));
+                        e.target.classList.add('active');
+                        this.currentDifficulty = e.target.dataset.difficulty;
+                        this.restartGame();
+                    });
+                });
+            }
 
-.info-item {
-    background-color: #333;
-    color: red;
-    padding: 5px 8px;
-    border-radius: 3px;
-    font-family: monospace;
-    font-weight: bold;
-    font-size: 0.9em;
-    min-width: 80px;
-    text-align: center;
-}
+            createBoard() {
+                const config = this.difficulties[this.currentDifficulty];
+                this.rows = config.rows;
+                this.cols = config.cols;
+                this.mines = config.mines;
+                this.board = [];
+                this.gameOver = false;
+                this.gameWon = false;
+                this.firstClick = true;
+                this.flaggedCells = 0;
+                this.timer = 0;
 
-.restart-btn {
-    background-color: #4CAF50;
-    color: white;
-    border: none;
-    padding: 8px 16px;
-    border-radius: 5px;
-    cursor: pointer;
-    font-size: 14px;
-    font-weight: bold;
-    white-space: nowrap;
-}
+                // Create empty board
+                for (let i = 0; i < this.rows; i++) {
+                    this.board[i] = [];
+                    for (let j = 0; j < this.cols; j++) {
+                        this.board[i][j] = {
+                            isMine: false,
+                            isRevealed: false,
+                            isFlagged: false,
+                            neighborCount: 0
+                        };
+                    }
+                }
 
-.restart-btn:hover {
-    background-color: #45a049;
-}
+                this.renderBoard();
+            }
 
-.game-board {
-    border: 2px solid #333;
-    border-radius: 5px;
-    overflow: hidden;
-    margin: 0 auto;
-    display: grid;
-    gap: 0;
-    grid-template-columns: repeat(9, 30px);
-    grid-template-rows: repeat(9, 30px);
-}
+            renderBoard() {
+                const gameBoard = document.getElementById('game-board');
+                gameBoard.innerHTML = '';
+                gameBoard.style.gridTemplateColumns = `repeat(${this.cols}, 30px)`;
+                gameBoard.style.gridTemplateRows = `repeat(${this.rows}, 30px)`;
 
-.cell {
-    width: 30px;
-    height: 30px;
-    border: 1px solid #999;
-    background-color: #ddd;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    font-weight: bold;
-    font-size: 12px;
-    user-select: none;
-    touch-action: manipulation;
-}
+                for (let i = 0; i < this.rows; i++) {
+                    for (let j = 0; j < this.cols; j++) {
+                        const cell = document.createElement('div');
+                        cell.className = 'cell';
+                        cell.dataset.row = i;
+                        cell.dataset.col = j;
+                        
+                        cell.addEventListener('click', (e) => this.handleCellClick(e, i, j));
+                        cell.addEventListener('contextmenu', (e) => this.handleRightClick(e, i, j));
+                        cell.addEventListener('touchstart', (e) => this.handleTouchStart(e, i, j));
+                        cell.addEventListener('touchend', (e) => this.handleTouchEnd(e, i, j));
+                        
+                        gameBoard.appendChild(cell);
+                    }
+                }
+            }
 
-.cell:hover {
-    background-color: #ccc;
-}
+            placeMines(excludeRow, excludeCol) {
+                let minesPlaced = 0;
+                while (minesPlaced < this.mines) {
+                    const row = Math.floor(Math.random() * this.rows);
+                    const col = Math.floor(Math.random() * this.cols);
+                    
+                    if (!this.board[row][col].isMine && (row !== excludeRow || col !== excludeCol)) {
+                        this.board[row][col].isMine = true;
+                        minesPlaced++;
+                    }
+                }
+                this.calculateNeighborCounts();
+            }
 
-.cell.revealed {
-    background-color: #fff;
-    cursor: default;
-}
+            calculateNeighborCounts() {
+                for (let i = 0; i < this.rows; i++) {
+                    for (let j = 0; j < this.cols; j++) {
+                        if (!this.board[i][j].isMine) {
+                            let count = 0;
+                            for (let di = -1; di <= 1; di++) {
+                                for (let dj = -1; dj <= 1; dj++) {
+                                    const ni = i + di;
+                                    const nj = j + dj;
+                                    if (ni >= 0 && ni < this.rows && nj >= 0 && nj < this.cols) {
+                                        if (this.board[ni][nj].isMine) count++;
+                                    }
+                                }
+                            }
+                            this.board[i][j].neighborCount = count;
+                        }
+                    }
+                }
+            }
 
-.cell.revealed:hover {
-    background-color: #fff;
-}
+            handleCellClick(event, row, col) {
+                if (this.gameOver || this.gameWon || this.board[row][col].isRevealed || this.board[row][col].isFlagged) {
+                    return;
+                }
 
-.cell.mine {
-    background-color: #ff4444;
-    color: white;
-}
+                if (this.firstClick) {
+                    this.placeMines(row, col);
+                    this.firstClick = false;
+                    this.startTimer();
+                }
 
-.cell.flagged {
-    background-color: #ffaa00;
-    color: white;
-}
+                this.revealCell(row, col);
+                this.updateDisplay();
+                this.checkWinCondition();
+            }
 
-.cell.flagged::before {
-    content: "🚩";
-    font-size: 14px;
-}
+            handleRightClick(event, row, col) {
+                event.preventDefault();
+                if (this.gameOver || this.gameWon || this.board[row][col].isRevealed) {
+                    return;
+                }
 
-.cell.mine::before {
-    content: "💣";
-    font-size: 14px;
-}
+                const cell = this.board[row][col];
+                if (cell.isFlagged) {
+                    cell.isFlagged = false;
+                    this.flaggedCells--;
+                } else {
+                    cell.isFlagged = true;
+                    this.flaggedCells++;
+                }
+                this.updateDisplay();
+            }
 
-.cell[data-count="1"] { color: #0000ff; }
-.cell[data-count="2"] { color: #008000; }
-.cell[data-count="3"] { color: #ff0000; }
-.cell[data-count="4"] { color: #800080; }
-.cell[data-count="5"] { color: #800000; }
-.cell[data-count="6"] { color: #008080; }
-.cell[data-count="7"] { color: #000000; }
-.cell[data-count="8"] { color: #808080; }
+            handleTouchStart(event, row, col) {
+                this.touchStartTime = Date.now();
+                this.touchStartCell = { row, col };
+            }
 
-.game-over {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background-color: rgba(0, 0, 0, 0.9);
-    color: white;
-    padding: 20px;
-    border-radius: 10px;
-    text-align: center;
-    font-size: 18px;
-    font-weight: bold;
-    z-index: 1000;
-    max-width: 90%;
-    width: 300px;
-}
+            handleTouchEnd(event, row, col) {
+                event.preventDefault();
+                const touchDuration = Date.now() - this.touchStartTime;
+                
+                if (this.touchStartCell && 
+                    this.touchStartCell.row === row && 
+                    this.touchStartCell.col === col) {
+                    
+                    if (touchDuration > 500) {
+                        // Long press - flag/unflag
+                        this.handleRightClick(event, row, col);
+                    } else {
+                        // Short tap - reveal
+                        this.handleCellClick(event, row, col);
+                    }
+                }
+            }
 
-.difficulty-selector {
-    margin-bottom: 15px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
+            revealCell(row, col) {
+                if (row < 0 || row >= this.rows || col < 0 || col >= this.cols) return;
+                if (this.board[row][col].isRevealed || this.board[row][col].isFlagged) return;
 
-.difficulty-btn {
-    background-color: #2196F3;
-    color: white;
-    border: none;
-    padding: 10px 12px;
-    border-radius: 5px;
-    cursor: pointer;
-    font-size: 14px;
-    text-align: center;
-}
+                this.board[row][col].isRevealed = true;
 
-.difficulty-btn.active {
-    background-color: #1976D2;
-}
+                if (this.board[row][col].isMine) {
+                    this.gameOver = true;
+                    this.revealAllMines();
+                    this.stopTimer();
+                    this.showGameOver(false);
+                    return;
+                }
 
-.difficulty-btn:hover {
-    background-color: #1976D2;
-}
+                if (this.board[row][col].neighborCount === 0) {
+                    for (let di = -1; di <= 1; di++) {
+                        for (let dj = -1; dj <= 1; dj++) {
+                            this.revealCell(row + di, col + dj);
+                        }
+                    }
+                }
+            }
 
-/* Mobile optimizations */
-@media (max-width: 768px) {
-    body {
-        padding: 5px;
-    }
-    
-    .game-container {
-        padding: 10px;
-    }
-    
-    h1 {
-        font-size: 1.3em;
-        margin-bottom: 10px;
-    }
-    
-    .game-header {
-        flex-direction: column;
-        gap: 8px;
-        padding: 8px;
-    }
-    
-    .game-info {
-        justify-content: center;
-        gap: 10px;
-    }
-    
-    .info-item {
-        font-size: 0.8em;
-        padding: 4px 6px;
-        min-width: 70px;
-    }
-    
-    .restart-btn {
-        font-size: 13px;
-        padding: 6px 12px;
-    }
-    
-    .cell {
-        width: 25px;
-        height: 25px;
-        font-size: 10px;
-    }
-    
-    .game-board {
-        grid-template-columns: repeat(9, 25px) !important;
-        grid-template-rows: repeat(9, 25px) !important;
-    }
-    
-    .cell.flagged::before,
-    .cell.mine::before {
-        font-size: 12px;
-    }
-    
-    .difficulty-btn {
-        font-size: 13px;
-        padding: 8px 10px;
-    }
-    
-    .game-over {
-        font-size: 16px;
-        padding: 15px;
-        width: 280px;
-    }
-}
+            revealAllMines() {
+                for (let i = 0; i < this.rows; i++) {
+                    for (let j = 0; j < this.cols; j++) {
+                        if (this.board[i][j].isMine) {
+                            this.board[i][j].isRevealed = true;
+                        }
+                    }
+                }
+            }
 
-@media (max-width: 480px) {
-    .cell {
-        width: 22px;
-        height: 22px;
-        font-size: 9px;
-    }
-    
-    .game-board {
-        grid-template-columns: repeat(9, 22px) !important;
-        grid-template-rows: repeat(9, 22px) !important;
-    }
-    
-    .cell.flagged::before,
-    .cell.mine::before {
-        font-size: 10px;
-    }
-    
-    .info-item {
-        font-size: 0.75em;
-        padding: 3px 5px;
-        min-width: 60px;
-    }
-    
-    .restart-btn {
-        font-size: 12px;
-        padding: 5px 10px;
-    }
-    
-    .difficulty-btn {
-        font-size: 12px;
-        padding: 6px 8px;
-    }
-}
+            checkWinCondition() {
+                let revealedCount = 0;
+                for (let i = 0; i < this.rows; i++) {
+                    for (let j = 0; j < this.cols; j++) {
+                        if (this.board[i][j].isRevealed && !this.board[i][j].isMine) {
+                            revealedCount++;
+                        }
+                    }
+                }
 
-/* Landscape orientation for mobile */
-@media (max-width: 768px) and (orientation: landscape) {
-    .game-container {
-        max-width: 100%;
-    }
-    
-    .cell {
-        width: 20px;
-        height: 20px;
-        font-size: 8px;
-    }
-    
-    .game-board {
-        grid-template-columns: repeat(9, 20px) !important;
-        grid-template-rows: repeat(9, 20px) !important;
-    }
-    
-    .cell.flagged::before,
-    .cell.mine::before {
-        font-size: 9px;
-    }
-    
-    .game-header {
-        flex-direction: row;
-        justify-content: space-between;
-    }
-    
-    .difficulty-selector {
-        flex-direction: row;
-        gap: 5px;
-    }
-    
-    .difficulty-btn {
-        font-size: 11px;
-        padding: 4px 6px;
-    }
-}
+                if (revealedCount === (this.rows * this.cols - this.mines)) {
+                    this.gameWon = true;
+                    this.stopTimer();
+                    this.showGameOver(true);
+                }
+            }
 
-/* Prevent zoom on double tap */
-.cell {
-    touch-action: manipulation;
-}
+            updateDisplay() {
+                // Update mine count
+                document.getElementById('mine-count').textContent = `Mayın: ${this.mines - this.flaggedCells}`;
 
-/* Better touch targets */
-@media (max-width: 768px) {
-    .cell {
-        min-width: 25px;
-        min-height: 25px;
-    }
-}
+                // Update board display
+                for (let i = 0; i < this.rows; i++) {
+                    for (let j = 0; j < this.cols; j++) {
+                        const cellElement = document.querySelector(`[data-row="${i}"][data-col="${j}"]`);
+                        const cell = this.board[i][j];
+                        
+                        cellElement.className = 'cell';
+                        cellElement.textContent = '';
+                        cellElement.removeAttribute('data-count');
+
+                        if (cell.isFlagged) {
+                            cellElement.classList.add('flagged');
+                        } else if (cell.isRevealed) {
+                            cellElement.classList.add('revealed');
+                            if (cell.isMine) {
+                                cellElement.classList.add('mine');
+                            } else if (cell.neighborCount > 0) {
+                                cellElement.textContent = cell.neighborCount;
+                                cellElement.setAttribute('data-count', cell.neighborCount);
+                            }
+                        }
+                    }
+                }
+            }
+
+            startTimer() {
+                this.timerInterval = setInterval(() => {
+                    this.timer++;
+                    document.getElementById('timer').textContent = `Süre: ${this.timer.toString().padStart(3, '0')}`;
+                }, 1000);
+            }
+
+            stopTimer() {
+                if (this.timerInterval) {
+                    clearInterval(this.timerInterval);
+                    this.timerInterval = null;
+                }
+            }
+
+            showGameOver(won) {
+                const message = won ? 'Tebrikler! Kazandınız! 🎉' : 'Oyun Bitti! Mayına bastınız! 💥';
+                const gameOverDiv = document.createElement('div');
+                gameOverDiv.className = 'game-over';
+                gameOverDiv.innerHTML = `
+                    <div>${message}</div>
+                    <div style="margin-top: 10px; font-size: 16px;">Süre: ${this.timer} saniye</div>
+                    <button class="restart-btn" onclick="this.parentElement.remove(); restartGame()" style="margin-top: 15px;">Tekrar Oyna</button>
+                `;
+                document.body.appendChild(gameOverDiv);
+            }
+
+            restartGame() {
+                this.stopTimer();
+                this.createBoard();
+                this.updateDisplay();
+            }
+        }
+
+        // Global game instance
+        let game;
+
+        // Initialize game when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            game = new Minesweeper();
+        });
+
+        // Global restart function
+        function restartGame() {
+            if (game) {
+                game.restartGame();
+            }
+        }
+    </script>
+</body>
+</html>
