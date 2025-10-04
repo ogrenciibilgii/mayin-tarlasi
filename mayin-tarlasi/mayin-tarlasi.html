@@ -96,7 +96,8 @@
             renderBoard() {
                 const gameBoard = document.getElementById('game-board');
                 gameBoard.innerHTML = '';
-                gameBoard.style.display = 'grid';
+                gameBoard.style.setProperty('--cols', this.cols);
+                gameBoard.style.setProperty('--rows', this.rows);
                 gameBoard.style.gridTemplateColumns = `repeat(${this.cols}, 30px)`;
                 gameBoard.style.gridTemplateRows = `repeat(${this.rows}, 30px)`;
 
