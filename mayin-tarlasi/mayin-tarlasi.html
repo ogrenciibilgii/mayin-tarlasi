@@ -2,7 +2,7 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Mayın Tarlası Oyunu</title>
     <link rel="stylesheet" href="mayin-tarlasi.css">
 </head>
@@ -109,6 +109,8 @@
                         
                         cell.addEventListener('click', (e) => this.handleCellClick(e, i, j));
                         cell.addEventListener('contextmenu', (e) => this.handleRightClick(e, i, j));
+                        cell.addEventListener('touchstart', (e) => this.handleTouchStart(e, i, j));
+                        cell.addEventListener('touchend', (e) => this.handleTouchEnd(e, i, j));
                         
                         gameBoard.appendChild(cell);
                     }
@@ -180,6 +182,29 @@
                     this.flaggedCells++;
                 }
                 this.updateDisplay();
+            }
+
+            handleTouchStart(event, row, col) {
+                this.touchStartTime = Date.now();
+                this.touchStartCell = { row, col };
+            }
+
+            handleTouchEnd(event, row, col) {
+                event.preventDefault();
+                const touchDuration = Date.now() - this.touchStartTime;
+                
+                if (this.touchStartCell && 
+                    this.touchStartCell.row === row && 
+                    this.touchStartCell.col === col) {
+                    
+                    if (touchDuration > 500) {
+                        // Long press - flag/unflag
+                        this.handleRightClick(event, row, col);
+                    } else {
+                        // Short tap - reveal
+                        this.handleCellClick(event, row, col);
+                    }
+                }
             }
 
             revealCell(row, col) {
