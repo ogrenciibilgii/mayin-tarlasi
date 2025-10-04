@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mayın Tarlası Oyunu</title>
+    <link rel="stylesheet" href="mayin-tarlasi.css">
+</head>
+<body>
+    <div class="game-container">
+        <h1>Mayın Tarlası Oyunu</h1>
+        
+        <div class="difficulty-selector">
+            <button class="difficulty-btn active" data-difficulty="easy">Kolay (9x9, 10 mayın)</button>
+            <button class="difficulty-btn" data-difficulty="medium">Orta (16x16, 40 mayın)</button>
+            <button class="difficulty-btn" data-difficulty="hard">Zor (16x30, 99 mayın)</button>
+        </div>
+
+        <div class="game-header">
+            <div class="game-info">
+                <div class="info-item" id="mine-count">Mayın: 10</div>
+                <div class="info-item" id="timer">Süre: 000</div>
+            </div>
+            <button class="restart-btn" onclick="restartGame()">Yeniden Başla</button>
+        </div>
+
+        <div class="game-board" id="game-board"></div>
+    </div>
+
+    <script>
+        class Minesweeper {
+            constructor() {
+                this.difficulties = {
+                    easy: { rows: 9, cols: 9, mines: 10 },
+                    medium: { rows: 16, cols: 16, mines: 40 },
+                    hard: { rows: 16, cols: 30, mines: 99 }
+                };
+                this.currentDifficulty = 'easy';
+                this.board = [];
+                this.gameOver = false;
+                this.gameWon = false;
+                this.firstClick = true;
+                this.timer = 0;
+                this.timerInterval = null;
+                this.flaggedCells = 0;
+                
+                this.init();
+            }
+
+            init() {
+                this.setupDifficultyButtons();
+                this.createBoard();
+                this.updateDisplay();
+            }
+
+            setupDifficultyButtons() {
+                const buttons = document.querySelectorAll('.difficulty-btn');
+                buttons.forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        buttons.forEach(b => b.classList.remove('active'));
+                        e.target.classList.add('active');
+                        this.currentDifficulty = e.target.dataset.difficulty;
+                        this.restartGame();
+                    });
+                });
+            }
+
+            createBoard() {
+                const config = this.difficulties[this.currentDifficulty];
+                this.rows = config.rows;
+                this.cols = config.cols;
+                this.mines = config.mines;
+                this.board = [];
+                this.gameOver = false;
+                this.gameWon = false;
+                this.firstClick = true;
+                this.flaggedCells = 0;
+                this.timer = 0;
+
+                // Create empty board
+                for (let i = 0; i < this.rows; i++) {
+                    this.board[i] = [];
+                    for (let j = 0; j < this.cols; j++) {
+                        this.board[i][j] = {
+                            isMine: false,
+                            isRevealed: false,
+                            isFlagged: false,
+                            neighborCount: 0
+                        };
+                    }
+                }
+
+                this.renderBoard();
+            }
+
+            renderBoard() {
+                const gameBoard = document.getElementById('game-board');
+                gameBoard.innerHTML = '';
+                gameBoard.style.display = 'grid';
+                gameBoard.style.gridTemplateColumns = `repeat(${this.cols}, 30px)`;
+                gameBoard.style.gridTemplateRows = `repeat(${this.rows}, 30px)`;
+
+                for (let i = 0; i < this.rows; i++) {
+                    for (let j = 0; j < this.cols; j++) {
+                        const cell = document.createElement('div');
+                        cell.className = 'cell';
+                        cell.dataset.row = i;
+                        cell.dataset.col = j;
+                        
+                        cell.addEventListener('click', (e) => this.handleCellClick(e, i, j));
+                        cell.addEventListener('contextmenu', (e) => this.handleRightClick(e, i, j));
+                        
+                        gameBoard.appendChild(cell);
+                    }
+                }
+            }
+
+            placeMines(excludeRow, excludeCol) {
+                let minesPlaced = 0;
+                while (minesPlaced < this.mines) {
+                    const row = Math.floor(Math.random() * this.rows);
+                    const col = Math.floor(Math.random() * this.cols);
+                    
+                    if (!this.board[row][col].isMine && (row !== excludeRow || col !== excludeCol)) {
+                        this.board[row][col].isMine = true;
+                        minesPlaced++;
+                    }
+                }
+                this.calculateNeighborCounts();
+            }
+
+            calculateNeighborCounts() {
+                for (let i = 0; i < this.rows; i++) {
+                    for (let j = 0; j < this.cols; j++) {
+                        if (!this.board[i][j].isMine) {
+                            let count = 0;
+                            for (let di = -1; di <= 1; di++) {
+                                for (let dj = -1; dj <= 1; dj++) {
+                                    const ni = i + di;
+                                    const nj = j + dj;
+                                    if (ni >= 0 && ni < this.rows && nj >= 0 && nj < this.cols) {
+                                        if (this.board[ni][nj].isMine) count++;
+                                    }
+                                }
+                            }
+                            this.board[i][j].neighborCount = count;
+                        }
+                    }
+                }
+            }
+
+            handleCellClick(event, row, col) {
+                if (this.gameOver || this.gameWon || this.board[row][col].isRevealed || this.board[row][col].isFlagged) {
+                    return;
+                }
+
+                if (this.firstClick) {
+                    this.placeMines(row, col);
+                    this.firstClick = false;
+                    this.startTimer();
+                }
+
+                this.revealCell(row, col);
+                this.updateDisplay();
+                this.checkWinCondition();
+            }
+
+            handleRightClick(event, row, col) {
+                event.preventDefault();
+                if (this.gameOver || this.gameWon || this.board[row][col].isRevealed) {
+                    return;
+                }
+
+                const cell = this.board[row][col];
+                if (cell.isFlagged) {
+                    cell.isFlagged = false;
+                    this.flaggedCells--;
+                } else {
+                    cell.isFlagged = true;
+                    this.flaggedCells++;
+                }
+                this.updateDisplay();
+            }
+
+            revealCell(row, col) {
+                if (row < 0 || row >= this.rows || col < 0 || col >= this.cols) return;
+                if (this.board[row][col].isRevealed || this.board[row][col].isFlagged) return;
+
+                this.board[row][col].isRevealed = true;
+
+                if (this.board[row][col].isMine) {
+                    this.gameOver = true;
+                    this.revealAllMines();
+                    this.stopTimer();
+                    this.showGameOver(false);
+                    return;
+                }
+
+                if (this.board[row][col].neighborCount === 0) {
+                    for (let di = -1; di <= 1; di++) {
+                        for (let dj = -1; dj <= 1; dj++) {
+                            this.revealCell(row + di, col + dj);
+                        }
+                    }
+                }
+            }
+
+            revealAllMines() {
+                for (let i = 0; i < this.rows; i++) {
+                    for (let j = 0; j < this.cols; j++) {
+                        if (this.board[i][j].isMine) {
+                            this.board[i][j].isRevealed = true;
+                        }
+                    }
+                }
+            }
+
+            checkWinCondition() {
+                let revealedCount = 0;
+                for (let i = 0; i < this.rows; i++) {
+                    for (let j = 0; j < this.cols; j++) {
+                        if (this.board[i][j].isRevealed && !this.board[i][j].isMine) {
+                            revealedCount++;
+                        }
+                    }
+                }
+
+                if (revealedCount === (this.rows * this.cols - this.mines)) {
+                    this.gameWon = true;
+                    this.stopTimer();
+                    this.showGameOver(true);
+                }
+            }
+
+            updateDisplay() {
+                // Update mine count
+                document.getElementById('mine-count').textContent = `Mayın: ${this.mines - this.flaggedCells}`;
+
+                // Update board display
+                for (let i = 0; i < this.rows; i++) {
+                    for (let j = 0; j < this.cols; j++) {
+                        const cellElement = document.querySelector(`[data-row="${i}"][data-col="${j}"]`);
+                        const cell = this.board[i][j];
+                        
+                        cellElement.className = 'cell';
+                        cellElement.textContent = '';
+                        cellElement.removeAttribute('data-count');
+
+                        if (cell.isFlagged) {
+                            cellElement.classList.add('flagged');
+                        } else if (cell.isRevealed) {
+                            cellElement.classList.add('revealed');
+                            if (cell.isMine) {
+                                cellElement.classList.add('mine');
+                            } else if (cell.neighborCount > 0) {
+                                cellElement.textContent = cell.neighborCount;
+                                cellElement.setAttribute('data-count', cell.neighborCount);
+                            }
+                        }
+                    }
+                }
+            }
+
+            startTimer() {
+                this.timerInterval = setInterval(() => {
+                    this.timer++;
+                    document.getElementById('timer').textContent = `Süre: ${this.timer.toString().padStart(3, '0')}`;
+                }, 1000);
+            }
+
+            stopTimer() {
+                if (this.timerInterval) {
+                    clearInterval(this.timerInterval);
+                    this.timerInterval = null;
+                }
+            }
+
+            showGameOver(won) {
+                const message = won ? 'Tebrikler! Kazandınız! 🎉' : 'Oyun Bitti! Mayına bastınız! 💥';
+                const gameOverDiv = document.createElement('div');
+                gameOverDiv.className = 'game-over';
+                gameOverDiv.innerHTML = `
+                    <div>${message}</div>
+                    <div style="margin-top: 10px; font-size: 16px;">Süre: ${this.timer} saniye</div>
+                    <button class="restart-btn" onclick="this.parentElement.remove(); restartGame()" style="margin-top: 15px;">Tekrar Oyna</button>
+                `;
+                document.body.appendChild(gameOverDiv);
+            }
+
+            restartGame() {
+                this.stopTimer();
+                this.createBoard();
+                this.updateDisplay();
+            }
+        }
+
+        // Global game instance
+        let game;
+
+        // Initialize game when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            game = new Minesweeper();
+        });
+
+        // Global restart function
+        function restartGame() {
+            if (game) {
+                game.restartGame();
+            }
+        }
+    </script>
+</body>
+</html>
